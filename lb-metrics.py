@@ -1,6 +1,11 @@
 import datetime
 import boto3
 from botocore.config import Config
+import sys
+
+if len(sys.argv) < 2:
+    print("provide atleast alb/elb name in parameter")
+    exit()
 
 # my_config = Config(
 #     region_name = 'us-west-2',
@@ -19,10 +24,10 @@ data_points = cw.get_metric_statistics(
     Dimensions= [
                 {
                     'Name': 'LoadBalancer',
-                    'Value': 'app/vault-alb/54072ae09b85d482'
+                    'Value': str(sys.argv[1])
                 }
             ],
-    StartTime=datetime.datetime.utcnow() - datetime.timedelta(minutes=120),
+    StartTime=datetime.datetime.utcnow() - datetime.timedelta(minutes=60),
     EndTime=datetime.datetime.utcnow(),
     Period=60,
     Statistics=[
@@ -36,61 +41,35 @@ add_up = 0
 for i in data_len:
     add_up += int(data_points['Datapoints'][i]['Sum'])
 
-print(add_up)
+if add_up > 0:
+    print ("Application ALB named " + str(sys.argv[1]) + " has traffic and request count is " + str(add_up))
+else:
+    print ("Application ALB named " + str(sys.argv[1]) + " has no traffic")
 
+if len(sys.argv) > 2:
+    classic_data_points = cw.get_metric_statistics(
+        Namespace='AWS/ELB',
+        MetricName='RequestCount',
+        Dimensions= [
+                    {
+                        'Name': 'LoadBalancerName',
+                        'Value': str(sys.argv[2])
+                    }
+                ],
+        StartTime=datetime.datetime.utcnow() - datetime.timedelta(minutes=240),
+        EndTime=datetime.datetime.utcnow(),
+        Period=60,
+        Statistics=[
+            'Sum',
+        ],
+        Unit='Count'
+    )
 
+    classic_add_up = 0
+    for i in range(len(classic_data_points['Datapoints'])):
+        classic_add_up += int(data_points['Datapoints'][i]['Sum'])
 
-classic_data_points = cw.get_metric_statistics(
-    Namespace='AWS/ELB',
-    MetricName='RequestCount',
-    Dimensions= [
-                {
-                    'Name': 'LoadBalancerName',
-                    'Value': 'classic-vault'
-                }
-            ],
-    StartTime=datetime.datetime.utcnow() - datetime.timedelta(minutes=240),
-    EndTime=datetime.datetime.utcnow(),
-    Period=60,
-    Statistics=[
-        'Sum',
-    ],
-    Unit='Count'
-)
-
-print (classic_data_points)
-
-# now = datetime.datetime.utcnow()    
-# twoHourAgo = datetime.datetime.utcnow() - datetime.timedelta(minutes=120)
-
-# print("Current Time =", now)
-# print ("two hour ago =", twoHourAgo)
-
-# response = cw.get_metric_data(
-#     MetricDataQueries=[
-#         {
-#             'Id': 'requestCountAlb',
-#             'MetricStat': {
-#                 'Metric': {
-#                     'Namespace': 'AWS/ApplicationELB',
-#                     'MetricName': 'RequestCount',
-#                     'Dimensions': [
-#                         {
-#                             'Name': 'LoadBalancer',
-#                             'Value': 'app/vault-alb/54072ae09b85d482'
-#                         }
-#                     ]
-#                 },
-#                 'Period': 60,
-#                 'Stat': 'Sum',
-#                 'Unit': 'Count'
-#             },
-#             'Label': 'vault-alb RequestCount',
-#         },
-#     ],
-#     StartTime=twoHourAgo,
-#     EndTime=now
-# )
-
-#print (response)
-
+    if classic_add_up > 0: 
+        print ("Classic ELB named " + str(sys.argv[2]) + " has traffic and request count is " + str(classic_add_up))
+    else:
+        print ("Classic ELB named " + str(sys.argv[2]) + " has no traffic")
